@@ -1,0 +1,30 @@
+# Never commit state, credentials, or vendored upstream clones.
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+
+# Secrets / key material
+.env
+.env.*
+*.pem
+*.key
+secrets/
+.conjur-admin-key
+.conjur-runner-key
+
+# Vendored upstream (cloned at runtime, not committed)
+vendor/
+**/vendor/
+
+# Scan output that may contain sensitive detail — commit curated findings only
+findings/*-raw.csv
+reports/*.xml
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

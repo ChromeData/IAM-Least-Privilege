@@ -1,0 +1,51 @@
+Checkov run: 2026-08-12 00:52:36
+Command: checkov --config-file .checkov.yaml
+Exit code: 0 (0 = no findings)
+============================================================
+2026-08-12 00:52:40,494 [ThreadPoolEx] [WARNI]  Failed to download module terraform-aws-modules/iam/aws//modules/iam-assumable-role:~> 5.0 (for external modules, the --download-external-modules flag is required)
+
+       _               _
+   ___| |__   ___  ___| | _______   __
+  / __| '_ \ / _ \/ __| |/ / _ \ \ / /
+ | (__| | | |  __/ (__|   < (_) \ V /
+  \___|_| |_|\___|\___|_|\_\___/ \_/
+
+By Prisma Cloud | version: 3.3.10 
+
+terraform scan results:
+
+Passed checks: 8, Failed checks: 0, Skipped checks: 0
+
+Check: CKV_AWS_41: "Ensure no hard coded AWS access key and secret key exists in provider"
+	PASSED for resource: aws.default
+	File: \main.tf:11-15
+	Guide: [1mhttps://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/secrets-policies/bc-aws-secrets-5
+[0mCheck: CKV_AWS_62: "Ensure IAM policies that allow full "*-*" administrative privileges are not created"
+	PASSED for resource: aws_iam_policy.boundary
+	File: \main.tf:21-40
+	Guide: [1mhttps://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-iam-policies/bc-aws-iam-45
+[0mCheck: CKV_AWS_287: "Ensure IAM policies does not allow credentials exposure"
+	PASSED for resource: aws_iam_policy.boundary
+	File: \main.tf:21-40
+	Guide: [1mhttps://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-iam-policies/bc-aws-287
+[0mCheck: CKV_AWS_286: "Ensure IAM policies does not allow privilege escalation"
+	PASSED for resource: aws_iam_policy.boundary
+	File: \main.tf:21-40
+	Guide: [1mhttps://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-iam-policies/bc-aws-286
+[0mCheck: CKV_AWS_63: "Ensure no IAM policies documents allow "*" as a statement's actions"
+	PASSED for resource: aws_iam_policy.boundary
+	File: \main.tf:21-40
+	Guide: [1mhttps://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-iam-policies/iam-48
+[0mCheck: CKV_TF_2: "Ensure Terraform module sources use a tag with a version number"
+	PASSED for resource: break_glass
+	File: \main.tf:43-58
+	Guide: [1mhttps://docs.prismacloud.io/en/enterprise-edition/policy-reference/supply-chain-policies/terraform-policies/ensure-terraform-module-sources-use-tag
+[0mCheck: CKV_TF_2: "Ensure Terraform module sources use a tag with a version number"
+	PASSED for resource: db_broker
+	File: \main.tf:61-73
+	Guide: [1mhttps://docs.prismacloud.io/en/enterprise-edition/policy-reference/supply-chain-policies/terraform-policies/ensure-terraform-module-sources-use-tag
+[0mCheck: CKV2_AWS_40: "Ensure AWS IAM policy does not allow full IAM privileges"
+	PASSED for resource: aws_iam_policy.boundary
+	File: \main.tf:21-40
+	Guide: [1mhttps://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-iam-policies/bc-aws-2-40
+[0m

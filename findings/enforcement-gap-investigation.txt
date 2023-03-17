@@ -1,0 +1,95 @@
+Can the boundary be proven to DENY, without an AWS account?
+Date: 2026-08-12
+Answer: no. Recorded here so nobody spends the afternoon I just spent.
+======================================================================
+
+THE GAP
+
+  LocalStack creates IAM objects faithfully. The roles exist, the boundary is
+  attached, the trust policies carry the right conditions, and all of that is
+  verified from the API in findings/localstack-apply-run.txt.
+
+  What it does not do is EVALUATE policy at request time. It will not refuse
+  a call the boundary should block, because it does not run an authorization
+  engine. So `make prove-denied`, the target that demonstrates the boundary
+  actually stops an IAM write, has nothing to run against.
+
+  Three options were tested. All three failed, for different reasons.
+
+OPTION 1: IAM's own simulator through LocalStack
+
+  iam:SimulatePrincipalPolicy is part of the IAM API, and it applies AWS's
+  real evaluation logic. If LocalStack implemented it, this would be the
+  clean answer: same semantics, no account.
+
+  It does not. LocalStack community returns 404:
+
+    aws iam simulate-principal-policy \
+      --policy-source-arn arn:aws:iam::000000000000:role/simtest \
+      --action-names iam:CreateUser
+
+    An error occurred (InternalError): 404 Not Found
+    exception while calling iam.SimulatePrincipalPolicy
+
+  Tested against a role carrying an explicit Deny on iam:*, which is exactly
+  the shape this lab needs to prove. Not implemented, so not available.
+
+OPTION 2: PMapper local authorization simulation
+
+  NCC Group's Principal Mapper implements IAM authorization logic offline in
+  principalmapper.querying.local_policy_simulation. It is the closest thing
+  that exists to an offline evaluator.
+
+  It does not run on a current Python:
+
+    ImportError: cannot import name 'Mapping' from 'collections'
+    principalmapper/util/case_insensitive_dict.py line 34
+
+  collections.Mapping was removed in Python 3.10. PyPI has 1.1.5 as the
+  newest release and every prior version is older, so this is not a
+  pin-to-a-newer-release problem. The project has not shipped since 2021.
+
+  It is a one-line shim (collections -> collections.abc), and that was
+  tempting. Rejected on purpose: shipping a patched copy of an unmaintained
+  third-party library, and then citing its output as evidence about IAM
+  semantics, is worse than having no evidence. The patch fixes the import,
+  not the four years of IAM behaviour the library has not tracked.
+
+OPTION 3: write the evaluator
+
+  Rejected immediately, and it is worth saying why in a repo about proving
+  controls work.
+
+  Reimplementing AWS's policy evaluation and then using it to prove my own
+  policy is correct proves nothing except that two things I wrote agree with
+  each other. Every real subtlety lives in the parts a reimplementation gets
+  wrong: boundary intersection, NotAction, condition-key evaluation order,
+  service-linked exceptions, resource-policy interaction. A green result from
+  it would be the most confident wrong answer in the whole repo.
+
+WHERE THAT LEAVES THINGS
+
+  Configuration:  verified. Deployed and read back from the IAM API.
+  Enforcement:    NOT verified, and not verifiable locally.
+
+  prove-denied stays a real-AWS target. It is marked that way in the Makefile
+  rather than quietly dropped, because the distinction between "the control
+  is configured" and "the control was observed blocking a request" is the
+  whole point of the lab.
+
+  The honest claim is the first one. Anyone reading this repo should assume
+  the boundary is correct by construction and unproven in practice, until
+  someone runs it against an account.
+
+WHAT WOULD CLOSE IT
+
+  One AWS account, free tier, about ten minutes:
+
+    make apply
+    make prove-denied     # assume break-glass, attempt iam:CreateUser
+                          # expect AccessDenied, reason: implicit deny in
+                          # permissions boundary
+
+  That single run also closes the equivalent gap in labs 02, 05 and 09,
+  which are all blocked on the same missing piece rather than on four
+  separate problems.

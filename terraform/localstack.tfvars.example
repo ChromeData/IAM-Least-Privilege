@@ -1,0 +1,23 @@
+# Running this lab against LocalStack instead of a real AWS account.
+#
+# LocalStack implements the real AWS APIs locally, so Terraform genuinely
+# applies and the IAM objects are genuinely created. It costs nothing and needs
+# no AWS account, which makes it the right way to prove the configuration is
+# correct before spending anything.
+#
+# What it does NOT prove: IAM policy EVALUATION. LocalStack creates the roles,
+# the boundary and the trust policies faithfully, but it does not enforce a
+# permissions boundary at request time the way AWS does. So `make prove-denied`
+# style checks have to run against real AWS to mean anything.
+#
+# Usage:
+#   docker run -d --name localstack -p 4566:4566 \
+#     -e SERVICES=iam,sts,kms,secretsmanager localstack/localstack:3
+#
+#   export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_REGION=us-east-1
+#   terraform init && terraform apply -var-file=localstack.tfvars
+#
+# The credentials are literally "test". LocalStack ignores them; they exist
+# because the AWS provider requires something to be set.
+
+use_localstack = true

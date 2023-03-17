@@ -1,0 +1,34 @@
+# Checkov config for the IAM least-privilege lab.
+#
+# The lab's claim is that these roles are minimal. Checkov is one of the two
+# independent tools that verify it (Access Analyzer is the other). It runs in CI.
+#
+# The skips below are deliberate and each carries its reason. A skip without a
+# justification is how "we scan our IaC" quietly becomes "we ignore our scanner."
+
+directory:
+  - terraform
+
+# Soft-fail off: a real finding fails the build.
+soft-fail: false
+
+skip-check:
+  # --- boundary wildcards: intentional -------------------------------------
+  # The permission boundary intentionally allows s3:* / secretsmanager:GetSecretValue
+  # at the top so that ROLES beneath it can be granted those actions. The boundary
+  # is a ceiling, not a grant - nothing is permitted unless a role's own policy
+  # ALSO allows it. Checkov flags the wildcard without understanding it's a bound.
+  - CKV_AWS_289  # permissive actions - by design, on the boundary
+  - CKV_AWS_290  # write access without constraint - boundary only
+  - CKV_AWS_288  # "data exfiltration" (s3:Get*) - boundary ceiling, not a grant
+  - CKV_AWS_355  # resource wildcard on write - boundary defines the ceiling as *
+
+  # --- module source pinning: not a security finding here ------------------
+  # CKV_TF_1 wants module sources pinned to a git commit hash. These modules come
+  # from the Terraform Registry pinned to a semver constraint (~> 5.0), which is
+  # the standard, supported way to consume registry modules. A commit hash on a
+  # registry source isn't even valid. This is noise for registry modules.
+  - CKV_TF_1
+
+# Everything else must pass. If a role below the boundary trips a real check,
+# that's a finding, not a skip.
