@@ -44,11 +44,11 @@ module "break_glass" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role"
   version = "~> 5.0"
 
-  create_role           = true
-  role_name             = "lab06-break-glass-admin"
-  role_requires_mfa     = true
-  max_session_duration  = 3600            # 1h, not the 12h default
-  permissions_boundary_arn = aws_iam_policy.boundary.arn
+  create_role                   = true
+  role_name                     = "lab06-break-glass-admin"
+  role_requires_mfa             = true
+  max_session_duration          = 3600 # 1h, not the 12h default
+  role_permissions_boundary_arn = aws_iam_policy.boundary.arn
 
   trusted_role_arns = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
 
@@ -62,12 +62,12 @@ module "db_broker" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role"
   version = "~> 5.0"
 
-  create_role          = true
-  role_name            = "lab06-db-broker"
-  role_sts_externalid  = ["lab06-broker-external-id"]   # shared-secret gate
-  max_session_duration = 3600
-  permissions_boundary_arn = aws_iam_policy.boundary.arn
+  create_role                   = true
+  role_name                     = "lab06-db-broker"
+  role_sts_externalid           = ["lab06-broker-external-id"] # shared-secret gate
+  max_session_duration          = 3600
+  role_permissions_boundary_arn = aws_iam_policy.boundary.arn
 
-  trusted_role_arns = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+  trusted_role_arns       = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
   custom_role_policy_arns = []
 }
