@@ -63,4 +63,45 @@ not a skip.
 
 ## Log
 
-_(first entry goes here on the first real apply)_
+### 2026-08-11 — first validate on the broker roles
+
+**Expected:** clean validate. The argument name looked obviously right.
+
+**Got:**
+
+```
+Error: Unsupported argument
+  51:   permissions_boundary_arn = aws_iam_policy.boundary.arn
+An argument named "permissions_boundary_arn" is not expected here.
+```
+
+**Cause:** The `iam-assumable-role` module calls it `role_permissions_boundary_arn`.
+I'd written the name the AWS API uses, not the name the module uses.
+
+**Fix:** Renamed on both roles.
+
+**Why this one matters:** without the boundary attached, both roles still create fine
+and look correct in the console. The ceiling just isn't there. This is a silent
+failure that only shows up the day someone tests whether break-glass can actually
+reach IAM. It's the reason every lab in this set runs `validate` in CI rather than
+trusting a read-through.
+
+---
+
+### 2026-08-12 — Checkov failing CI on the boundary
+
+**Expected:** green, since I'd already skipped CKV_AWS_289/290 for the boundary's
+intentional wildcards.
+
+**Got:** 4 failures: `CKV_AWS_288`, `CKV_AWS_355`, and `CKV_TF_1` twice.
+
+**Cause:** Two more checks flag the same intentional boundary wildcards from different
+angles (data exfiltration, resource wildcard on write). `CKV_TF_1` is different: it
+wants module sources pinned to a git commit hash, which isn't even valid syntax for a
+Terraform Registry source pinned to `~> 5.0`.
+
+**Fix:** Added all four to `.checkov.yaml`, each with its reason written next to it.
+Local re-run: `Passed checks: 8, Failed checks: 0`.
+
+**Rule I'm keeping:** a skip without a written justification is how "we scan our IaC"
+turns into "we ignore our scanner." Every skip in that file says why.
