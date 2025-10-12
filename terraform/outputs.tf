@@ -1,5 +1,5 @@
 output "boundary_arn" {
-  description = "The permission boundary — the hard ceiling every role inherits."
+  description = "The permission boundary, the hard ceiling every role inherits."
   value       = aws_iam_policy.boundary.arn
 }
 

@@ -1,4 +1,4 @@
-# Lab Notes — 06 IAM Least-Privilege
+# Lab Notes, 06 IAM Least-Privilege
 
 Running log. Errors, dead ends, fixes, surprises. Dated, newest at the bottom.
 
@@ -7,7 +7,7 @@ Running log. Errors, dead ends, fixes, surprises. Dated, newest at the bottom.
 ## Format
 
 ```
-### YYYY-MM-DD — what I was trying to do
+### YYYY-MM-DD, what I was trying to do
 
 **Expected:**
 **Got:**
@@ -19,12 +19,11 @@ Running log. Errors, dead ends, fixes, surprises. Dated, newest at the bottom.
 
 ## Finds and decisions
 
-### Module argument name — caught by validate
+### Module argument name, caught by validate
 
 Wrote `permissions_boundary_arn`; the iam-assumable-role module wants
 `role_permissions_boundary_arn`. `terraform validate` failed with "argument not
-expected here". Fixed both roles. This is exactly why every lab validates in CI —
-the wrong name looks plausible and fails only at plan.
+expected here". Fixed both roles. This is exactly why every lab validates in CI. The wrong name looks plausible and fails only at plan.
 
 ### The boundary is a ceiling, not a grant
 
@@ -45,7 +44,7 @@ not a skip.
 
 - **Prove the boundary, don't assume it.** Assume break-glass and run
   `aws iam create-user`. It must fail with "implicit deny in permissions
-  boundary" — if it fails for a different reason, the boundary isn't doing the
+  boundary", if it fails for a different reason, the boundary isn't doing the
   work you think it is.
 - **External ID on the broker.** Confirm assuming `lab06-db-broker` WITHOUT the
   external ID is denied. That's the whole control.
@@ -63,7 +62,7 @@ not a skip.
 
 ## Log
 
-### 2026-08-11 — first validate on the broker roles
+### 2026-08-11, first validate on the broker roles
 
 **Expected:** clean validate. The argument name looked obviously right.
 
@@ -88,7 +87,7 @@ trusting a read-through.
 
 ---
 
-### 2026-08-12 — Checkov failing CI on the boundary
+### 2026-08-12, Checkov failing CI on the boundary
 
 **Expected:** green, since I'd already skipped CKV_AWS_289/290 for the boundary's
 intentional wildcards.
