@@ -9,7 +9,7 @@
 | **Domains** | CyberArk/Idira, AWS |
 | **Built on** | [terraform-aws-modules/iam](https://github.com/terraform-aws-modules/terraform-aws-iam) (Anton Babenko) |
 | **Cost** | Under $1 (IAM objects are free). **Runtime** ~4 hours |
-| **Status** | Built and verified. validate clean, Checkov 8 passed 0 failed (output in findings/). Not yet applied |
+| **Status** | Applied for real against LocalStack. Controls verified from the IAM API, one module-default bug found and fixed (output in findings/). Enforcement test still needs real AWS |
 
 ## Situation
 
@@ -33,7 +33,7 @@ Three pieces:
 
 Two tools verify it, both in CI. Checkov scans the Terraform and fails the build on a real finding, with two intentional boundary skips that each carry a written reason. IAM Access Analyzer validates the deployed policies.
 
-Building it caught a real bug: the module argument is `role_permissions_boundary_arn`, not `permissions_boundary_arn`. `terraform validate` flagged it, and the fix is in the history.
+**Applied for real** against LocalStack, which implements the IAM API locally at zero cost, then every control was read back from the API rather than trusted from the config. That found a bug nothing else did.`n`nThe db-broker trust policy came back carrying an MFA condition this configuration never set, because the upstream module defaults `role_requires_mfa` to true. Break-glass should require MFA, since a human assumes it. The broker is assumed by a service, and a service cannot present MFA, so that condition does not harden the role, it makes it unassumable by the only thing meant to use it. It would have deployed looking perfect and failed on first use. Fixed and re-verified.`n`nAn earlier bug came from `terraform validate`: the module argument is `role_permissions_boundary_arn`, not `permissions_boundary_arn`. Both are in the history.`n`nWhat LocalStack does not prove is enforcement, since it does not evaluate policy at request time. The `prove-denied` test still needs real AWS. Full output in [findings/localstack-apply-run.txt](./findings/localstack-apply-run.txt).
 
 ## What I did not build
 

@@ -1,0 +1,59 @@
+IAM lab, real apply against LocalStack
+Date: 2026-08-12 02:08:47
+Backend: localstack/localstack:3 (real AWS IAM API, running locally)
+======================================================================
+
+APPLY
+  Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+
+VERIFIED FROM THE IAM API, NOT FROM THE CONFIG
+
+  break-glass boundary:      arn:aws:iam::000000000000:policy/lab06-permission-boundary
+  break-glass max session:   3600  (AWS default is 43200)
+  break-glass MFA required:  true
+  db-broker boundary:        arn:aws:iam::000000000000:policy/lab06-permission-boundary
+  db-broker condition:
+    {
+        "StringEquals": {
+            "sts:ExternalId": "lab06-broker-external-id"
+        }
+    }
+  boundary denies:
+    [
+        [
+            "iam:*",
+            "organizations:*",
+            "account:*"
+        ]
+    ]
+
+BUG FOUND BY THIS RUN
+  The db-broker trust policy came back carrying an
+  aws:MultiFactorAuthPresent condition that the configuration never set.
+  Cause: terraform-aws-modules/iam defaults role_requires_mfa to true.
+
+  That is wrong for this role specifically. Break-glass is assumed by a
+  human and should require MFA. The broker is assumed by a service, and a
+  service cannot present MFA, so the condition does not harden the role,
+  it makes it unassumable by the only thing meant to assume it. The role
+  would have deployed looking correct and failed the first time anything
+  tried to use it.
+
+  Fixed with an explicit role_requires_mfa = false. Re-applied, and the
+  broker condition is now the external id alone, as intended.
+
+  Only visible by reading the deployed object back from the API. The
+  Terraform config, the plan and terraform validate all looked fine.
+
+WHAT THIS PROVES, AND WHAT IT DOES NOT
+  Proves: the configuration applies cleanly and the controls are really
+  present on the deployed roles: boundary attached to both, 1 hour session
+  cap instead of the 12 hour default, MFA on break-glass, external id on
+  the broker, and a boundary that explicitly denies iam, organizations
+  and account actions.
+
+  Does NOT prove: enforcement. LocalStack creates IAM objects faithfully
+  but does not evaluate policy at request time, so it will not refuse a
+  call the boundary should block. The prove-denied test needs real AWS.
+  Until then the honest claim is that the controls are configured and
+  deployed, not that they were observed blocking a request.
