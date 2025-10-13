@@ -30,3 +30,18 @@ jobs:
       - run: pip install checkov
       - name: scan
         run: checkov --config-file .checkov.yaml
+
+  enforcement-logic:
+    name: prove-enforcement verdict logic
+    runs-on: ubuntu-latest
+    # The script itself cannot run without an AWS account, which means the part
+    # most likely to be wrong, the branching on what AWS actually said, would
+    # ship unexercised. This feeds real AWS error strings through the verdict
+    # function and asserts each classification.
+    #
+    # Notably it pins that a bare "AccessDenied" is NOT a pass: if the role's
+    # own policy did the blocking, the boundary was never exercised and could
+    # be missing entirely.
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/prove-enforcement.sh --self-test

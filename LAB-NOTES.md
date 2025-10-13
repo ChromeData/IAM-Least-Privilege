@@ -238,3 +238,31 @@ is present in the config and does nothing at request time is exactly what these
 labs exist to find, and it is precisely what no offline check can see.
 
 ---
+
+### 2026-08-12, testing the runbook I cannot run
+
+`prove-enforcement.sh` needs an AWS account, so the part most likely to be
+wrong, the branching on what AWS actually said, would have shipped completely
+unexercised. Writing a check I have never seen execute is the same mistake as
+trusting a green I have never seen fail.
+
+Pulled the verdict logic into `classify_iam_write()` and added `--self-test`,
+which feeds it real AWS error wording:
+
+```
+PASS  explicit boundary deny
+PASS  implicit boundary deny
+PASS  plain AccessDenied is NOT a pass
+PASS  successful create is a failure
+PASS  empty output is not a denial
+```
+
+The third case is the one that matters. A bare `AccessDenied` is treated as a
+**failure**, not a pass: if the role's own policy did the blocking, the boundary
+was never exercised and could be absent entirely. A check that accepts any
+denial would report success on a lab with no boundary at all.
+
+Runs in CI. What is still untested is the AWS calls themselves, and that stays
+true until someone runs it against an account.
+
+---

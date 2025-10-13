@@ -36,6 +36,81 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# ---------------------------------------------------------------------------
+# Verdict logic, isolated so it can be tested without an AWS account.
+#
+# This script cannot be run end to end until someone has an account, which
+# means the part most likely to be wrong, the branching on what AWS actually
+# said, would ship unexercised. Pulling it into one function lets --self-test
+# feed it real AWS error strings and assert the verdicts.
+#
+# The distinction that matters: "AccessDenied" alone is NOT a pass. If the
+# role's own policy did the blocking, the boundary was never exercised and
+# could be missing entirely. Only a denial that names the boundary proves the
+# boundary is doing the work.
+# ---------------------------------------------------------------------------
+classify_iam_write() {
+  local out="$1"
+  if grep -qi "explicit deny\|implicit deny\|permissions boundary" <<<"${out}"; then
+    echo "BOUNDARY_DENIED"
+  elif grep -qi "accessdenied\|not authorized" <<<"${out}"; then
+    echo "DENIED_BUT_NOT_BY_BOUNDARY"
+  else
+    echo "NOT_DENIED"
+  fi
+}
+
+self_test() {
+  local fails=0
+  check() {
+    local desc="$1" input="$2" want="$3"
+    local got; got="$(classify_iam_write "${input}")"
+    if [[ "${got}" == "${want}" ]]; then
+      echo "  PASS  ${desc}"
+    else
+      echo "  FAIL  ${desc}: wanted ${want}, got ${got}"
+      fails=1
+    fi
+  }
+
+  echo "==> verdict logic self-test (no AWS account needed)"
+
+  # Real AWS wording, boundary path. This is the only true pass.
+  check "explicit boundary deny" \
+    "An error occurred (AccessDenied) when calling the CreateUser operation: User: arn:aws:sts::1:assumed-role/lab06-break-glass-admin/x is not authorized to perform: iam:CreateUser on resource: user should-be-denied with an explicit deny in a permissions boundary" \
+    "BOUNDARY_DENIED"
+
+  check "implicit boundary deny" \
+    "User: arn:aws:sts::1:assumed-role/x is not authorized to perform: iam:CreateUser because no permissions boundary allows the iam:CreateUser action" \
+    "BOUNDARY_DENIED"
+
+  # Denied, but the boundary is not named. The role policy may be masking a
+  # boundary that is absent. Reported as a failure on purpose.
+  check "plain AccessDenied is NOT a pass" \
+    "An error occurred (AccessDenied) when calling the CreateUser operation: User: arn:aws:sts::1:assumed-role/x is not authorized to perform: iam:CreateUser" \
+    "DENIED_BUT_NOT_BY_BOUNDARY"
+
+  # The failure this whole script exists to catch.
+  check "successful create is a failure" \
+    '{"User": {"UserName": "should-be-denied", "Arn": "arn:aws:iam::1:user/should-be-denied"}}' \
+    "NOT_DENIED"
+
+  check "empty output is not a denial" "" "NOT_DENIED"
+
+  echo
+  if [[ ${fails} -eq 0 ]]; then
+    echo "verdict logic correct. The AWS calls themselves still need an account."
+  else
+    echo "verdict logic is WRONG. Fix before running this against an account."
+  fi
+  return ${fails}
+}
+
+if [[ "${1:-}" == "--self-test" ]]; then
+  self_test
+  exit $?
+fi
+
 : "${LAB_ACCOUNT_ID:?set LAB_ACCOUNT_ID to the throwaway account id you intend to use}"
 
 ACTUAL="$(aws sts get-caller-identity --query Account --output text 2>/dev/null)" || {
@@ -100,15 +175,16 @@ else
          AWS_SESSION_TOKEN="$(jq -r .Credentials.SessionToken <<<"${CREDS}")" \
          aws iam create-user --user-name should-be-denied 2>&1)"
 
-  if grep -qi "explicit deny\|implicit deny\|permissions boundary" <<<"${OUT}"; then
-    pass "iam:CreateUser denied, and the reason names the boundary"
-  elif grep -qi "accessdenied" <<<"${OUT}"; then
-    # Denied, but not by the boundary. The role's own policy may be doing the
-    # work, which means the boundary is untested and could be absent.
-    bad "denied, but NOT by the boundary. The role policy may be masking it: ${OUT:0:120}"
-  else
-    bad "the IAM write was NOT blocked. The boundary is not doing its job."
-  fi
+  case "$(classify_iam_write "${OUT}")" in
+    BOUNDARY_DENIED)
+      pass "iam:CreateUser denied, and the reason names the boundary" ;;
+    DENIED_BUT_NOT_BY_BOUNDARY)
+      # Denied, but not by the boundary. The role's own policy may be doing the
+      # work, which means the boundary is untested and could be absent.
+      bad "denied, but NOT by the boundary. The role policy may be masking it: ${OUT:0:120}" ;;
+    *)
+      bad "the IAM write was NOT blocked. The boundary is not doing its job." ;;
+  esac
 fi
 echo
 
