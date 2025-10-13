@@ -9,7 +9,7 @@
 | **Domains** | CyberArk/Idira, AWS |
 | **Built on** | [terraform-aws-modules/iam](https://github.com/terraform-aws-modules/terraform-aws-iam) (Anton Babenko) |
 | **Cost** | Under $1 (IAM objects are free). **Runtime** ~4 hours |
-| **Status** | Applied for real against LocalStack. Controls verified from the IAM API, one module-default bug found and fixed (output in findings/). Enforcement test still needs real AWS |
+| **Status** | Enforcement PROVEN against real AWS: the boundary was observed denying iam:CreateUser and naming itself in the denial (findings/enforcement-proven-real-aws.txt). MFA and external-id conditions verified enforcing |
 
 ## Situation
 

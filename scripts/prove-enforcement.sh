@@ -135,16 +135,18 @@ bad()  { echo "  FAIL  $1"; fail=1; }
 cleanup() {
   echo
   echo "==> teardown"
-  terraform -chdir=terraform destroy -auto-approve \
-    -var "allowed_account_ids=[\"${LAB_ACCOUNT_ID}\"]" >/dev/null 2>&1 \
+  terraform -chdir=terraform destroy -auto-approve >/dev/null 2>&1 \
     && echo "  destroyed" || echo "  DESTROY FAILED, check the account by hand"
 }
 trap cleanup EXIT
 
 echo "==> apply (IAM only, nothing billable)"
 terraform -chdir=terraform init -input=false >/dev/null
-terraform -chdir=terraform apply -auto-approve \
-  -var "allowed_account_ids=[\"${LAB_ACCOUNT_ID}\"]" >/dev/null || {
+# No -var here. This lab declares only use_localstack; the account allowlist
+# variable belongs to lab 02, and passing it made Terraform reject the apply
+# outright ("Value for undeclared variable"). The account guardrail for this
+# lab is the sts:GetCallerIdentity check above, which has already run.
+terraform -chdir=terraform apply -auto-approve >/dev/null || {
     echo "apply failed"; exit 1; }
 echo "  applied"
 echo
@@ -154,8 +156,36 @@ BROKER_ARN="$(terraform -chdir=terraform output -raw db_broker_role_arn)"
 
 assume() {
   # Assume a role and emit exportable credentials, or nothing on failure.
-  aws sts assume-role --role-arn "$1" --role-session-name "$2" \
-    ${3:+--external-id "$3"} --output json 2>/dev/null
+  #
+  # Retries, and that is not defensive padding. IAM is eventually consistent:
+  # a role created seconds ago returns
+  #
+  #   User: ... is not authorized to perform: sts:AssumeRole on resource: ...
+  #
+  # even when the trust policy is correct and the caller holds
+  # AdministratorAccess. The first real run of this script reported
+  # "the correct external id was ALSO refused, the role is unusable" purely
+  # because of that window; a retry ten seconds later assumed it first try.
+  #
+  # A false FAIL is as damaging as a false PASS here. Someone would have gone
+  # looking for a bug in a trust policy that was right all along.
+  local arn="$1" session="$2" ext="${3:-}"
+  local out
+  for _ in 1 2 3 4 5 6; do
+    out="$(aws sts assume-role --role-arn "${arn}" --role-session-name "${session}" \
+           ${ext:+--external-id "${ext}"} --output json 2>/dev/null)"
+    if [[ -n "${out}" ]]; then echo "${out}"; return 0; fi
+    sleep 5
+  done
+  return 1
+}
+
+assume_once() {
+  # No retry. For the cases where a DENIAL is the expected result, so waiting
+  # would only slow the run down.
+  local arn="$1" session="$2" ext="${3:-}"
+  aws sts assume-role --role-arn "${arn}" --role-session-name "${session}" \
+    ${ext:+--external-id "${ext}"} --output json 2>/dev/null
 }
 
 # ---------------------------------------------------------------------------
@@ -165,10 +195,24 @@ assume() {
 # a boundary that denies iam:*. The role should be unable to create a user even
 # though it is the "admin" role.
 # ---------------------------------------------------------------------------
-echo "==> lab 06: boundary blocks IAM writes"
-CREDS="$(assume "${BG_ARN}" prove-denied)"
+# Break-glass requires MFA, so a plain key session cannot assume it. That is the
+# control working, not a problem, and it is worth asserting directly.
+echo "==> lab 06: break-glass refuses a session without MFA"
+if [[ -n "$(assume_once "${BG_ARN}" no-mfa)" ]]; then
+  bad "assumed break-glass WITHOUT MFA. The MFA condition is not enforcing."
+else
+  pass "assume-role without MFA was refused"
+fi
+echo
+
+# The boundary is attached to BOTH roles, so it can be exercised through the
+# broker, which is assumable without MFA. Testing it only through break-glass
+# would mean the headline control of this lab goes unverified on any machine
+# that is not in an MFA session, which is most of them.
+echo "==> lab 06: boundary blocks IAM writes (via the broker)"
+CREDS="$(assume "${BROKER_ARN}" prove-denied lab06-broker-external-id)"
 if [[ -z "${CREDS}" ]]; then
-  bad "could not assume break-glass (MFA is required on this role; run this from an MFA session)"
+  bad "could not assume the broker, so the boundary could not be exercised"
 else
   OUT="$(AWS_ACCESS_KEY_ID="$(jq -r .Credentials.AccessKeyId <<<"${CREDS}")" \
          AWS_SECRET_ACCESS_KEY="$(jq -r .Credentials.SecretAccessKey <<<"${CREDS}")" \
@@ -195,7 +239,7 @@ echo
 # the condition is written wrong. Assuming without the id must fail.
 # ---------------------------------------------------------------------------
 echo "==> lab 06: broker refuses assumption without the external id"
-if [[ -n "$(assume "${BROKER_ARN}" no-external-id)" ]]; then
+if [[ -n "$(assume_once "${BROKER_ARN}" no-external-id)" ]]; then
   bad "assumed the broker WITHOUT the external id. The condition is not enforcing."
 else
   pass "assume-role without the external id was refused"
