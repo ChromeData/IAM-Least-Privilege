@@ -1,5 +1,8 @@
 # Lab 06: IAM Least Privilege and Break Glass Broker Roles
 
+<p align="center"><img src="assets/enforcement-proven.svg" alt="Boundary observed enforcing on real AWS" width="720"></p>
+
+
 [![tests](https://github.com/ChromeData/IAM-Least-Privilege/actions/workflows/tests.yml/badge.svg)](https://github.com/ChromeData/IAM-Least-Privilege/actions/workflows/tests.yml)
 
 **AWS roles built the way a PAM engineer thinks: a hard ceiling nothing can exceed, admin access that is read only until an incident, and a broker role with no standing credentials. Then proven minimal by two separate tools.**
