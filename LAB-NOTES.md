@@ -1,30 +1,66 @@
-# Lab Notes — IAM Least-Privilege & Broker Roles
+# Lab Notes — 06 IAM Least-Privilege
 
-> Running log, newest first.
+Running log. Errors, dead ends, fixes, surprises. Dated, newest at the bottom.
 
-## Known traps (pre-seeded)
+---
 
-### Permission boundary vs. policy — the confusing interaction
+## Format
 
-A role's effective permissions are the INTERSECTION of its policy and its boundary.
-If the break-glass role "can't do X" despite an allow in its policy, the boundary is
-denying it. That's the boundary working. Document the first time this surprises you.
+```
+### YYYY-MM-DD — what I was trying to do
 
-### External ID must match exactly
+**Expected:**
+**Got:**
+**Cause:**
+**Fix:**
+```
 
-`db-broker` requires `lab06-broker-external-id` on assume. A confused-deputy test —
-assuming without it — should fail. Try it, confirm the failure, record it.
+---
 
-### Checkov will flag the wildcards in the boundary
+## Finds and decisions
 
-`s3:*` in the boundary is intentional (it's a ceiling, not a grant), but Checkov
-flags it. This is the right kind of finding to document as an accepted exception
-with reasoning, rather than suppress silently.
+### Module argument name — caught by validate
 
-## YYYY-MM-DD — <first real entry>
+Wrote `permissions_boundary_arn`; the iam-assumable-role module wants
+`role_permissions_boundary_arn`. `terraform validate` failed with "argument not
+expected here". Fixed both roles. This is exactly why every lab validates in CI —
+the wrong name looks plausible and fails only at plan.
 
-**Goal:** · **What happened:** · **Why:** · **Fix:** · **Time lost:**
+### The boundary is a ceiling, not a grant
+
+Easy to misread the top-level `Allow s3:* / secretsmanager:GetSecretValue` as
+"these roles can do all that." They can't. The boundary caps what a role's own
+policy is *allowed* to grant. Break-glass ships with ReadOnlyAccess, so despite
+the boundary permitting s3:*, the role can only read. The two must intersect.
+
+### Checkov skips are justified inline
+
+CKV_AWS_289/290 flag the boundary's wildcards. Skipped with reasons in
+`.checkov.yaml`. Anything below the boundary that trips a check is a real finding,
+not a skip.
+
+---
+
+## Known traps (confirm on apply)
+
+- **Prove the boundary, don't assume it.** Assume break-glass and run
+  `aws iam create-user`. It must fail with "implicit deny in permissions
+  boundary" — if it fails for a different reason, the boundary isn't doing the
+  work you think it is.
+- **External ID on the broker.** Confirm assuming `lab06-db-broker` WITHOUT the
+  external ID is denied. That's the whole control.
+- **MFA on break-glass.** Confirm assume-role without MFA is refused.
+
+---
 
 ## Open questions
-- [ ] Does Access Analyzer catch the confused-deputy risk, or only static issues?
-- [ ] How does a session policy scope-down interact with the boundary?
+
+- [ ] Does Access Analyzer flag anything on the deployed policies?
+- [ ] Does the boundary deny reach IAM before the role's ReadOnly allow? (Order.)
+- [ ] Screenshot the boundary-denied create-user for findings/.
+
+---
+
+## Log
+
+_(first entry goes here on the first real apply)_
