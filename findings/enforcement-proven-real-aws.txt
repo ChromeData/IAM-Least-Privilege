@@ -1,0 +1,100 @@
+Enforcement proven against real AWS
+Date: 2026-08-12
+Account: redacted, a throwaway created for this run
+Cost: $0. IAM roles, policies and STS calls only.
+======================================================================
+
+WHAT CHANGED
+
+  Every control in this lab was previously verified as CONFIGURED and
+  unverified as ENFORCING. LocalStack creates IAM objects faithfully and
+  runs no authorization engine, so it will never refuse a call, and three
+  offline substitutes were tested and rejected (see
+  enforcement-gap-investigation.txt).
+
+  This is the run that closes it.
+
+RESULT
+
+  ==> lab 06: break-glass refuses a session without MFA
+    PASS  assume-role without MFA was refused
+
+  ==> lab 06: boundary blocks IAM writes (via the broker)
+    PASS  iam:CreateUser denied, and the reason names the boundary
+
+  ==> lab 06: broker refuses assumption without the external id
+    PASS  assume-role without the external id was refused
+  ==> lab 06: broker accepts the correct external id
+    PASS  assume-role with the external id succeeded
+
+  ==> lab 06: broker trust policy carries no MFA condition
+    PASS  no MFA condition on the machine role
+
+  ALL CONTROLS ENFORCED.
+
+THE EVIDENCE, VERBATIM
+
+  Assumed lab06-db-broker, then attempted an IAM write:
+
+    An error occurred (AccessDenied) when calling the CreateUser operation:
+    User: arn:aws:sts::<ACCOUNT>:assumed-role/lab06-db-broker/evidence is
+    not authorized to perform: iam:CreateUser on resource:
+    arn:aws:iam::<ACCOUNT>:user/should-be-denied with an explicit deny in a
+    permissions boundary: arn:aws:iam::<ACCOUNT>:policy/lab06-permission-boundary
+
+  AWS names the boundary policy by ARN. That is the distinction this lab
+  cares about: not "the call was denied", but "the call was denied BY THE
+  BOUNDARY". A denial from the role's own policy would have looked almost
+  identical and proven nothing about the ceiling.
+
+TWO BUGS THIS RUN FOUND, BOTH IN THE SCRIPT
+
+  1. IAM IS EVENTUALLY CONSISTENT, AND THE SCRIPT DID NOT KNOW
+
+     First run reported:
+
+       FAIL  the correct external id was ALSO refused. The role is unusable.
+
+     The trust policy was correct. The caller held AdministratorAccess. The
+     role had been created four seconds earlier, and AWS returned
+
+       User: ... is not authorized to perform: sts:AssumeRole on resource: ...
+
+     A retry ten seconds later assumed it on the first attempt.
+
+     A false FAIL is as damaging as a false PASS. Someone would have spent
+     an afternoon debugging a trust policy that was right the whole time.
+     assume() now retries; the checks that EXPECT a denial use assume_once()
+     so a legitimate refusal is not slowed by pointless waiting.
+
+  2. THE BOUNDARY WAS ONLY TESTABLE FROM AN MFA SESSION
+
+     The original script exercised the boundary through break-glass, which
+     requires MFA. From an ordinary key session it could not assume the role
+     at all, so the headline control of this lab went unverified on any
+     machine not already in an MFA session, which is most of them.
+
+     The boundary is attached to BOTH roles, so it is now exercised through
+     the broker, which is assumable without MFA. Break-glass keeps its own
+     check, and it is a real one: assuming it WITHOUT MFA must be refused,
+     which asserts the MFA condition rather than working around it.
+
+  Also fixed: the script passed -var allowed_account_ids, which belongs to
+  lab 02. This lab does not declare it, so Terraform rejected the apply
+  outright. The account guardrail here is the sts:GetCallerIdentity check.
+
+TEARDOWN
+
+  Destroy complete! Resources: 4 destroyed.
+
+  Verified empty afterwards: no lab06 roles, no lab06 policies, and no
+  should-be-denied user left behind.
+
+WHAT THIS DOES AND DOES NOT EXTEND TO
+
+  Proven here: the permissions boundary blocks IAM writes, the MFA
+  condition on break-glass holds, and the external id on the broker is
+  required rather than merely present.
+
+  Labs 02, 05 and 09 share the same class of claim and have NOT been run
+  this way yet. They are not covered by this file.

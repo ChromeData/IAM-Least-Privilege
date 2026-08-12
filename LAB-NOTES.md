@@ -266,3 +266,58 @@ Runs in CI. What is still untested is the AWS calls themselves, and that stays
 true until someone runs it against an account.
 
 ---
+
+### 2026-08-12, the boundary was observed blocking a request
+
+Ran `prove-enforcement.sh` against a real throwaway account. Cost: nothing, IAM
+and STS only.
+
+```
+break-glass refuses a session without MFA          PASS
+boundary blocks IAM writes (via the broker)        PASS
+broker refuses assumption without the external id  PASS
+broker accepts the correct external id             PASS
+broker trust policy carries no MFA condition       PASS
+
+ALL CONTROLS ENFORCED.
+```
+
+The evidence, verbatim:
+
+```
+An error occurred (AccessDenied) when calling the CreateUser operation:
+User: arn:aws:sts::<ACCOUNT>:assumed-role/lab06-db-broker/evidence is not
+authorized to perform: iam:CreateUser on resource:
+arn:aws:iam::<ACCOUNT>:user/should-be-denied with an explicit deny in a
+permissions boundary: arn:aws:iam::<ACCOUNT>:policy/lab06-permission-boundary
+```
+
+AWS names the boundary policy by ARN. That is the whole distinction: not "the
+call was denied" but "the call was denied **by the boundary**". A denial from
+the role's own policy would read almost identically and prove nothing about the
+ceiling, which is why the script treats a bare `AccessDenied` as a failure.
+
+**Two bugs, both mine, both only findable by running it.**
+
+**IAM is eventually consistent.** The first run reported `the correct external
+id was ALSO refused. The role is unusable.` The trust policy was correct, the
+caller held AdministratorAccess, and the role was four seconds old. A retry ten
+seconds later assumed it first try. A false FAIL is as damaging as a false PASS:
+someone would have spent an afternoon debugging a trust policy that was right
+the whole time. `assume()` now retries, and the checks that *expect* a denial
+use `assume_once()` so a legitimate refusal is not slowed by pointless waiting.
+
+**The boundary was only testable from an MFA session.** The script exercised it
+through break-glass, which requires MFA, so from an ordinary key session the
+headline control of this lab could not be verified at all. It now runs through
+the broker, which is assumable without MFA and carries the same boundary.
+Break-glass keeps its own check, and it is a better one: assuming it *without*
+MFA must be refused, which asserts the condition instead of working around it.
+
+Teardown confirmed clean: 4 resources destroyed, no lab06 roles, policies, or
+leftover `should-be-denied` user.
+
+Full output in `findings/enforcement-proven-real-aws.txt`. Labs 02, 05 and 09
+share this class of claim and have not been run this way yet.
+
+---
