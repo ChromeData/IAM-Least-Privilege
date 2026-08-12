@@ -87,6 +87,62 @@ trusting a read-through.
 
 ---
 
+### 2026-08-12, first real apply, and the broker was quietly broken
+
+Ran the configuration against LocalStack, which implements the real IAM API
+locally. No AWS account, no cost, and a genuine `terraform apply`.
+
+```
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+```
+
+Then read every control back **from the API rather than from the config**,
+which is the only reason I found this:
+
+```
+db-broker trust policy condition:
+{
+  "Bool":            { "aws:MultiFactorAuthPresent": "true" },
+  "NumericLessThan": { "aws:MultiFactorAuthAge": "86400" },
+  "StringEquals":    { "sts:ExternalId": "lab06-broker-external-id" }
+}
+```
+
+The external id is there as intended. The **MFA condition is not** anything this
+configuration asked for. `terraform-aws-modules/iam` defaults
+`role_requires_mfa` to `true`.
+
+**Why that is a real bug and not a harmless extra control.** Break-glass is
+assumed by a human, so MFA belongs on it and is set deliberately. The broker is
+assumed by a *service*. A service cannot present MFA. So the condition does not
+harden the broker, it makes it unassumable by the only thing that is supposed to
+assume it. The role deploys, looks correct in the console, passes
+`terraform validate`, passes Checkov, and fails the first time anything tries to
+use it.
+
+Set `role_requires_mfa = false` explicitly, re-applied, and confirmed:
+
+```
+db-broker trust policy condition:
+{ "StringEquals": { "sts:ExternalId": "lab06-broker-external-id" } }
+```
+
+**The lesson worth keeping:** a module default can add a control you never asked
+for, and "extra security control" is not automatically safe. The config was
+clean at every layer I had been checking. It only surfaced by inspecting the
+deployed object.
+
+Also confirmed working as intended: boundary attached to both roles, 3600 second
+session cap against the 43200 default, and the boundary explicitly denying
+`iam:*`, `organizations:*` and `account:*`.
+
+**What this run does not prove:** enforcement. LocalStack creates IAM objects
+faithfully but does not evaluate policy at request time, so it will not refuse a
+call the boundary should block. `prove-denied` still needs real AWS. Full output
+in `findings/localstack-apply-run.txt`.
+
+---
+
 ### 2026-08-12, Checkov failing CI on the boundary
 
 **Expected:** green, since I'd already skipped CKV_AWS_289/290 for the boundary's
