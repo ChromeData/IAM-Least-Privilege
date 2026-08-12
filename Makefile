@@ -31,6 +31,12 @@ verify-config: ## Read every control back from the IAM API (works on LocalStack)
 	@echo "db-broker trust condition (external id, and NO MFA, it is a machine role):"
 	@aws iam get-role --role-name lab06-db-broker --query 'Role.AssumeRolePolicyDocument.Statement[0].Condition' --output json
 
+prove-enforcement: ## [REAL AWS ONLY] Run every enforcement check, with teardown
+	@# One script, four checks, closes the gap for labs 02/05/06/09 at once.
+	@# IAM and STS only, nothing billable. Refuses to run outside the account
+	@# named in LAB_ACCOUNT_ID and tears down even when a check fails.
+	bash scripts/prove-enforcement.sh
+
 prove-denied: ## [REAL AWS ONLY] Prove the boundary actually BLOCKS an IAM write
 	@# This is the one thing LocalStack cannot do. It creates IAM objects but
 	@# runs no authorization engine, so it will never refuse a call. Three

@@ -197,3 +197,44 @@ One free-tier account closes this, and it closes the identical gap in labs 02,
 Detail in `findings/enforcement-gap-investigation.txt`.
 
 ---
+
+### 2026-08-12, wrote the runbook for the ten minutes after someone has an account
+
+The enforcement gap is not four problems, it is one missing ingredient shared by
+labs 02, 05, 06 and 09. So rather than leave four READMEs each saying "needs a
+real account", `scripts/prove-enforcement.sh` closes all of it in one run.
+
+Four checks, all of which are invisible to every offline tool:
+
+1. the boundary **blocks** `iam:CreateUser`, and the denial names the boundary.
+   A plain AccessDenied is reported as a FAILURE, not a pass: if the role's own
+   policy is doing the work, the boundary is untested and could be absent
+   entirely.
+2. the broker **refuses** assumption without the external id. A trust policy can
+   carry `sts:ExternalId` and still be assumable without it if the condition is
+   written wrong.
+3. the broker **accepts** the correct external id, because a control that denies
+   everything is not a working control.
+4. the broker carries **no MFA condition**, the module default that would make a
+   machine role unassumable by any machine.
+
+Cost is zero: IAM roles, policies and STS calls only. No EC2, no KMS, no trail.
+
+Three guards, and I tested each rather than trusting them:
+
+```
+no LAB_ACCOUNT_ID        -> exit 1
+cannot reach AWS         -> exit 2
+credentials point at a
+  different account      -> exit 2, refuses before touching anything
+```
+
+Teardown is on a trap, so it runs even when a check fails. That matters more
+than it sounds: the run most likely to leave privileged roles lying around is
+the one that errored halfway.
+
+A FAIL from this script is the useful outcome, not the bad one. A control that
+is present in the config and does nothing at request time is exactly what these
+labs exist to find, and it is precisely what no offline check can see.
+
+---
