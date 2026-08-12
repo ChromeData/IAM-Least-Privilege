@@ -9,7 +9,7 @@
 | **Domains** | CyberArk/Idira, AWS |
 | **Built on** | [terraform-aws-modules/iam](https://github.com/terraform-aws-modules/terraform-aws-iam) (Anton Babenko) |
 | **Cost** | Under $1 (IAM objects are free). **Runtime** ~4 hours |
-| **Status** | Built, validated, not yet applied |
+| **Status** | Built and verified. validate clean, Checkov 8 passed 0 failed (output in findings/). Not yet applied |
 
 ## Situation
 

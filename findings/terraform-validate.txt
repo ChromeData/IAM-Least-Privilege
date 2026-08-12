@@ -1,0 +1,10 @@
+Validation run: 2026-08-12 00:51:58
+Terraform: Terraform v1.9.8
+============================================================
+
+$ terraform fmt -check -recursive   (exit 0)
+  no formatting drift
+
+$ terraform validate   (exit 0)
+Success! The configuration is valid.
+
