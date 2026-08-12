@@ -11,7 +11,7 @@
 |---|---|
 | **Domains** | CyberArk/Idira, AWS |
 | **Built on** | [terraform-aws-modules/iam](https://github.com/terraform-aws-modules/terraform-aws-iam) (Anton Babenko) |
-| **Cost** | Under $1 (IAM objects are free). **Runtime** ~4 hours |
+| **Cost** | `$0` — IAM and STS only, nothing billable |
 | **Status** | Enforcement PROVEN against real AWS: the boundary was observed denying iam:CreateUser and naming itself in the denial (findings/enforcement-proven-real-aws.txt). MFA and external-id conditions verified enforcing |
 
 ## Situation
@@ -34,9 +34,22 @@ Three pieces:
 
 ## Result
 
-Two tools verify it, both in CI. Checkov scans the Terraform and fails the build on a real finding, with two intentional boundary skips that each carry a written reason. IAM Access Analyzer validates the deployed policies.
+**The controls were observed enforcing on real AWS**, not just configured. Assuming the broker and attempting an IAM write returned:
 
-**Applied for real** against LocalStack, which implements the IAM API locally at zero cost, then every control was read back from the API rather than trusted from the config. That found a bug nothing else did.`n`nThe db-broker trust policy came back carrying an MFA condition this configuration never set, because the upstream module defaults `role_requires_mfa` to true. Break-glass should require MFA, since a human assumes it. The broker is assumed by a service, and a service cannot present MFA, so that condition does not harden the role, it makes it unassumable by the only thing meant to use it. It would have deployed looking perfect and failed on first use. Fixed and re-verified.`n`nAn earlier bug came from `terraform validate`: the module argument is `role_permissions_boundary_arn`, not `permissions_boundary_arn`. Both are in the history.`n`nWhat LocalStack does not prove is enforcement, since it does not evaluate policy at request time. The `prove-denied` test still needs real AWS. Full output in [findings/localstack-apply-run.txt](./findings/localstack-apply-run.txt).
+```
+AccessDenied ... not authorized to perform: iam:CreateUser ... with an explicit
+deny in a permissions boundary: arn:aws:iam::<ACCOUNT>:policy/lab06-permission-boundary
+```
+
+AWS names the boundary policy by ARN. That is the distinction this lab is about: not "the call was denied," but "denied **by the boundary**." A denial from the role's own policy would read almost identically and prove nothing about the ceiling. All five checks — boundary denial, MFA on break-glass, external-id required and accepted on the broker — passed. Cost `$0`, IAM and STS only, torn down after. Full output in [findings/enforcement-proven-real-aws.txt](./findings/enforcement-proven-real-aws.txt).
+
+**Getting there surfaced three bugs that no static check caught:**
+
+- **A module default made the broker unassumable.** Reading the deployed trust policy back from the API (not from the config) showed an MFA condition this configuration never set — `terraform-aws-modules/iam` defaults `role_requires_mfa` to true. Break-glass should require MFA because a human assumes it; the broker is assumed by a *service*, which cannot present MFA, so the condition made the role unusable by the only thing meant to use it. It would have deployed looking perfect and failed on first use. Found via LocalStack, fixed, re-verified.
+- **The enforcement runbook reported a false failure.** IAM is eventually consistent: a four-second-old role returned `AccessDenied` on assume-role even with a correct trust policy. Without a retry the script would have sent someone debugging a policy that was right. Now retries, while the checks that *expect* a denial do not.
+- **A wrong module argument**, caught by `terraform validate`: it is `role_permissions_boundary_arn`, not `permissions_boundary_arn`. Without it the boundary silently is not attached and the role looks correct in the console.
+
+Two tools guard it in CI. Checkov fails the build on real findings, with two intentional boundary skips that each carry a written reason. The enforcement verdict logic is unit-tested (a bare `AccessDenied` is treated as a *failure*, since it does not prove the boundary did the work).
 
 ## What I did not build
 
@@ -55,7 +68,7 @@ Needs Terraform 1.9+ and Python 3.
 
 ## Findings
 
-`findings/` fills in on the first apply and Access Analyzer run. [LAB-NOTES.md](./LAB-NOTES.md) is the log.
+[`findings/`](./findings/) holds the real run output, including the verbatim boundary denial from real AWS. [LAB-NOTES.md](./LAB-NOTES.md) is the running log of what broke and why.
 
 ## License
 
