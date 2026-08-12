@@ -160,3 +160,40 @@ Local re-run: `Passed checks: 8, Failed checks: 0`.
 
 **Rule I'm keeping:** a skip without a written justification is how "we scan our IaC"
 turns into "we ignore our scanner." Every skip in that file says why.
+
+### 2026-08-12, tried three ways to prove the boundary denies, without an account
+
+LocalStack builds the objects and enforces nothing, so `prove-denied` had
+nothing to run against. Three options, all dead ends, recorded so the next
+person does not repeat them:
+
+1. **`iam:SimulatePrincipalPolicy` via LocalStack.** Would have been the clean
+   answer, since it is AWS's own evaluation logic exposed as an API call.
+   LocalStack community returns 404. Tested against a role carrying an explicit
+   `Deny` on `iam:*`, exactly the shape this lab needs.
+
+2. **PMapper's offline authorization simulation.** Closest thing that exists.
+   Dies on import: `cannot import name 'Mapping' from 'collections'`, removed in
+   Python 3.10. PyPI's newest is 1.1.5 and nothing newer exists, so this is not
+   a version-pin problem; the project has not shipped since 2021. It is a
+   one-line shim and I did not apply it: citing a patched unmaintained library
+   as evidence about IAM semantics is worse than admitting I have none. The
+   patch fixes the import, not four years of untracked IAM behaviour.
+
+3. **Write the evaluator.** No. Reimplementing AWS's evaluation and then using
+   it to prove my own policy correct demonstrates only that two things I wrote
+   agree. Every real subtlety lives exactly where a reimplementation goes wrong:
+   boundary intersection, `NotAction`, condition-key ordering, resource-policy
+   interaction. It would be the most confident wrong answer in the repo.
+
+So: configuration verified, enforcement not, and `prove-denied` is now an
+explicit `[REAL AWS ONLY]` make target rather than an aspiration in a Terraform
+output string. Also added `make localstack` and `make verify-config` so the part
+that *can* be checked locally is one command.
+
+One free-tier account closes this, and it closes the identical gap in labs 02,
+05 and 09 at the same time. They are one missing piece, not four problems.
+
+Detail in `findings/enforcement-gap-investigation.txt`.
+
+---
