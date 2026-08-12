@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="586" viewBox="0 0 620 586" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13">
+<rect width="620" height="586" rx="8" fill="#0d1117" stroke="#30363d"/>
+<rect width="620" height="34" rx="8" fill="#161b22"/>
+<rect y="26" width="620" height="8" fill="#161b22"/>
+<circle cx="18" cy="17" r="5" fill="#ff5f56"/>
+<circle cx="36" cy="17" r="5" fill="#ffbd2e"/>
+<circle cx="54" cy="17" r="5" fill="#27c93f"/>
+<text x="72" y="22" fill="#8b949e">prove-enforcement.sh  (real AWS, $0)</text>
+<text x="16" y="54" fill="#7ee787">$</text><text x="33" y="54" fill="#c9d1d9">LAB_ACCOUNT_ID=&lt;ACCOUNT&gt; bash scripts/prove-enforcement.sh</text>
+<text x="16" y="94" fill="#c9d1d9" xml:space="preserve">Account &lt;ACCOUNT&gt; confirmed.</text>
+<text x="16" y="134" fill="#39c5cf" font-weight="600" xml:space="preserve">==&gt; apply (IAM only, nothing billable)</text>
+<text x="16" y="154" fill="#c9d1d9" xml:space="preserve">  applied</text>
+<text x="16" y="194" fill="#39c5cf" font-weight="600" xml:space="preserve">==&gt; lab 06: break-glass refuses a session without MFA</text>
+<text x="16" y="214" fill="#3fb950" xml:space="preserve">  PASS  assume-role without MFA was refused</text>
+<text x="16" y="254" fill="#39c5cf" font-weight="600" xml:space="preserve">==&gt; lab 06: boundary blocks IAM writes (via the broker)</text>
+<text x="16" y="274" fill="#3fb950" xml:space="preserve">  PASS  iam:CreateUser denied, and the reason names the boundary</text>
+<text x="16" y="314" fill="#39c5cf" font-weight="600" xml:space="preserve">==&gt; lab 06: broker refuses assumption without the external id</text>
+<text x="16" y="334" fill="#3fb950" xml:space="preserve">  PASS  assume-role without the external id was refused</text>
+<text x="16" y="354" fill="#39c5cf" font-weight="600" xml:space="preserve">==&gt; lab 06: broker accepts the correct external id</text>
+<text x="16" y="374" fill="#3fb950" xml:space="preserve">  PASS  assume-role with the external id succeeded</text>
+<text x="16" y="414" fill="#39c5cf" font-weight="600" xml:space="preserve">==&gt; lab 06: broker trust policy carries no MFA condition</text>
+<text x="16" y="434" fill="#3fb950" xml:space="preserve">  PASS  no MFA condition on the machine role</text>
+<text x="16" y="474" fill="#c9d1d9" xml:space="preserve">======================================================================</text>
+<text x="16" y="494" fill="#3fb950" font-weight="600" xml:space="preserve">ALL CONTROLS ENFORCED.</text>
+<text x="16" y="534" fill="#39c5cf" font-weight="600" xml:space="preserve">==&gt; teardown</text>
+<text x="16" y="554" fill="#c9d1d9" xml:space="preserve">  destroyed</text>
+</svg>
